@@ -1,0 +1,4 @@
+FROM gcc:10.3-buster
+
+RUN wget https://coreboot.org/releases/coreboot-4.14.tar.xz && tar xf coreboot-4.14.tar.xz && rm /coreboot-4.14.tar.xz
+RUN cd /coreboot-4.14/util/cbfstool && make
