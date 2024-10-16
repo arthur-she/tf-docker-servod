@@ -1,0 +1,68 @@
+version: "3.9"
+
+# common settings, it must starts with 'x-'
+x-common: &common_settings
+  image: servod-image
+  build:
+    context: .
+    dockerfile: Dockerfile
+  restart: always
+  privileged: true
+  logging:
+    driver: json-file
+    options:
+        max-size: "10m"
+        max-file: "10"
+  network_mode: "host"
+  cap_add:
+    - NET_ADMIN
+  volumes:
+    - /dev:/dev
+    - /run/pts:/run/pts
+    - /var/log/servod:/var/log/servod
+    - /etc/timezone:/etc/timezone
+    - /etc/localtime:/etc/localtime
+  command: ["/bin/bash", "/post_servod.sh"]
+
+services:
+  asurada-01:
+    # include the common settings
+    <<: *common_settings
+    container_name: "asurada-01-servod"
+    hostname: "asurada-01-servod"
+    environment:
+      - PORT=9999
+      - MODEL=asurada
+      - BOARD=asurada
+      - SERIAL=1800F02C-94AB4762
+      - LAVA_DEVICE=asurada-01
+
+#services:
+#  lazor-01:
+#    # include the common settings
+#    <<: *common_settings
+#    container_name: "lazor-01-servod"
+#    hostname: "lazor-01-servod"
+#    environment:
+#      - PORT=9999
+#      - MODEL=trogdor
+#      - BOARD=trogdor
+#      - SERIAL=19002037-8C243923
+#      - LAVA_DEVICE=lazor-01
+
+#services:
+#  corsola-01:
+#    # include the common settings
+#    <<: *common_settings
+#    container_name: "corsola-01-servod"
+#    hostname: "corsola-01-servod"
+#    environment:
+#      - PORT=9989
+#      - MODEL=corsola_tentacruel
+#      - BOARD=corsola_tentacruel
+#      - SERIAL=24015014-4c1b4b03    # Device 1
+#      - SERIAL=24012052-4c1b4b03   # Device 2
+#      - SERIAL=24016034-4c1b4b03   # Device 3
+#      - SERIAL=2401301f-4c1b4b03
+#      - SERIAL=2300e066-4c1b4b03
+#      - LAVA_DEVICE=corsola-01
