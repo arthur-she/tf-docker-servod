@@ -1,5 +1,3 @@
-version: "3.9"
-
 # common settings, it must starts with 'x-'
 x-common: &common_settings
   image: servod-image
@@ -24,18 +22,18 @@ x-common: &common_settings
     - /etc/localtime:/etc/localtime
   command: ["/bin/bash", "/post_servod.sh"]
 
-services:
-  asurada-01:
-    # include the common settings
-    <<: *common_settings
-    container_name: "asurada-01-servod"
-    hostname: "asurada-01-servod"
-    environment:
-      - PORT=9999
-      - MODEL=asurada
-      - BOARD=asurada
-      - SERIAL=1800F02C-94AB4762
-      - LAVA_DEVICE=asurada-01
+#services:
+#  asurada-01:
+#    # include the common settings
+#    <<: *common_settings
+#    container_name: "asurada-01-servod"
+#    hostname: "asurada-01-servod"
+#    environment:
+#      - PORT=9999
+#      - MODEL=asurada
+#      - BOARD=asurada
+#      - SERIAL=1800F02C-94AB4762
+#      - LAVA_DEVICE=asurada-01
 
 #services:
 #  lazor-01:
@@ -66,3 +64,19 @@ services:
 #      - SERIAL=2401301f-4c1b4b03
 #      - SERIAL=2300e066-4c1b4b03
 #      - LAVA_DEVICE=corsola-01
+#
+services:
+  geralt-01:
+    # include the common settings
+    <<: *common_settings
+    container_name: "geralt-01-servod"
+    hostname: "geralt-01-servod"
+    environment:
+      - PORT=9999
+      - MODEL=geralt
+      - BOARD=geralt
+        #- SERIAL=1400803f-4c1b4b03   # Geralt-01
+        #- SERIAL=1400e05c-4c1b4b03    # Geralt-02
+      - SERIAL=1400e002-4c1b4b03    # Geralt-05
+      - LAVA_DEVICE=geralt-01
+
