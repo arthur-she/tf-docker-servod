@@ -27,7 +27,7 @@ LABEL com.centurylinklabs.watchtower.enable="false"
 RUN apt-get autoclean \
     && rm -rf /var/lib/apt/lists/*
 
-RUN ln -s /usr/bin/futility /usr/bin/gbb_utility
+#RUN ln -s /usr/bin/futility /usr/bin/gbb_utility
 
 # Add --log-dir parameter to servod
 RUN sed -i '$ s/$/ \\/' /start_servod.sh; \
