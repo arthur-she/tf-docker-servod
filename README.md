@@ -18,7 +18,7 @@ serial on a dedicated TCP port.
 | `post_servod.sh` | Container entrypoint — launches `start_servod.sh` and links UART pty paths into `/run/pts/`. |
 | `start_servod.sh` / `stop_servod.sh` | Wrappers around the upstream servod start/stop scripts; baked into the image. |
 | `Dockerfile.cbfstool` | Separate image that builds `cbfstool` from coreboot 4.14. |
-| `install.sh` | Installs the udev integration (handler, rule, tmpfiles config). |
+| `install-servod-usb-handler.sh` | Installs the udev integration (handler, rule, tmpfiles config). |
 | `udev/` | Source files for the udev integration. |
 
 ## Running
@@ -56,7 +56,7 @@ host reboots and after the servod process exits.
 
 ## udev auto start/stop
 
-`install.sh` deploys three files that wire each Ti50 USB device
+`install-servod-usb-handler.sh` deploys three files that wire each Ti50 USB device
 (`18d1:504a`) to its compose service:
 
 - `/usr/local/bin/servod-usb-handler` — looks up the device's serial in the
@@ -72,11 +72,11 @@ The mapping from serial to compose service is resolved at runtime from
 To install:
 
 ```bash
-sudo ./install.sh
+sudo ./install-servod-usb-handler.sh
 ```
 
 The handler's default `COMPOSE_FILE` is wired to the `docker-compose.yaml`
-sitting next to `install.sh`. Override at runtime with the `COMPOSE_FILE` env
+sitting next to `install-servod-usb-handler.sh`. Override at runtime with the `COMPOSE_FILE` env
 var if you need to point at a different file.
 
 After install, plugging a Ti50 listed in `docker-compose.yaml` starts its

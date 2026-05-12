@@ -12,7 +12,7 @@ COMPOSE_FILE="$INSTALL_DIR/docker-compose.yaml"
 UDEV_SRC="$INSTALL_DIR/udev"
 
 if [[ ! -f "$COMPOSE_FILE" ]]; then
-  echo "error: docker-compose.yaml not found next to install.sh ($COMPOSE_FILE)" >&2
+  echo "error: docker-compose.yaml not found next to install-servod-usb-handler.sh ($COMPOSE_FILE)" >&2
   exit 1
 fi
 
