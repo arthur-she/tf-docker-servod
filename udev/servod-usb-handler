@@ -1,0 +1,108 @@
+#!/usr/bin/env bash
+# Invoked by udev when a Ti50 USB device (18d1:504a) is added or removed.
+# On add: reads SERIAL from sysfs, persists kernel->serial mapping, starts the
+# docker-compose service whose SERIAL env matches. On remove: looks up the
+# persisted serial (sysfs is gone by then), stops the matching service.
+#
+# The default COMPOSE_FILE is substituted by install.sh to point at the
+# docker-compose.yaml in the directory where install.sh lives.
+
+set -euo pipefail
+
+ACTION="${1:-}"
+KERNEL="${2:-}"
+SERIAL_ARG="${3:-}"
+COMPOSE_FILE="${COMPOSE_FILE:-__COMPOSE_FILE__}"
+STATE_DIR="/run/servod-usb"
+LOG_TAG="servod-usb-handler"
+
+log() { logger -t "$LOG_TAG" -- "$*"; }
+
+if [[ -z "$ACTION" || -z "$KERNEL" ]]; then
+  log "missing arguments (action='$ACTION' kernel='$KERNEL')"
+  exit 1
+fi
+
+if [[ ! -f "$COMPOSE_FILE" ]]; then
+  log "compose file not found: $COMPOSE_FILE"
+  exit 1
+fi
+
+mkdir -p "$STATE_DIR"
+
+case "$ACTION" in
+  add)
+    SERIAL="$SERIAL_ARG"
+    if [[ -z "$SERIAL" ]]; then
+      SERIAL="$(cat "/sys/bus/usb/devices/$KERNEL/serial" 2>/dev/null || true)"
+    fi
+    if [[ -z "$SERIAL" ]]; then
+      log "add: no serial available for kernel=$KERNEL"
+      exit 0
+    fi
+    ;;
+  remove)
+    if [[ ! -f "$STATE_DIR/$KERNEL" ]]; then
+      exit 0
+    fi
+    SERIAL="$(cat "$STATE_DIR/$KERNEL")"
+    ;;
+  *)
+    log "unknown action '$ACTION'"
+    exit 1
+    ;;
+esac
+
+service="$(
+  /usr/bin/python3 - "$COMPOSE_FILE" "$SERIAL" <<'PY'
+import re, sys
+path, target = sys.argv[1], sys.argv[2]
+in_services = False
+current = None
+match = None
+with open(path) as fh:
+    for raw in fh:
+        line = raw.rstrip("\n")
+        stripped = line.lstrip()
+        if not stripped:
+            continue
+        indent = len(line) - len(stripped)
+        if indent == 0:
+            in_services = stripped.startswith("services:")
+            current = None
+            continue
+        if not in_services:
+            continue
+        if stripped.startswith("#"):
+            continue
+        if indent == 2 and stripped.endswith(":"):
+            current = stripped[:-1].strip()
+            continue
+        m = re.match(r"-\s*SERIAL\s*=\s*(\S+)", stripped)
+        if m and m.group(1) == target and current:
+            match = current
+            break
+print(match or "")
+PY
+)"
+
+if [[ -z "$service" ]]; then
+  log "no service in $COMPOSE_FILE matches serial $SERIAL ($KERNEL); ignoring $ACTION"
+  [[ "$ACTION" == "remove" ]] && rm -f "$STATE_DIR/$KERNEL"
+  exit 0
+fi
+
+cd "$(dirname "$COMPOSE_FILE")"
+
+case "$ACTION" in
+  add)
+    printf '%s\n' "$SERIAL" > "$STATE_DIR/$KERNEL"
+    log "USB add: starting service '$service' (kernel=$KERNEL serial=$SERIAL)"
+    /usr/bin/docker compose -f "$COMPOSE_FILE" start "$service" 2>&1 | logger -t "$LOG_TAG"
+    ;;
+  remove)
+    log "USB remove: stopping service '$service' (kernel=$KERNEL serial=$SERIAL)"
+    /usr/bin/docker compose -f "$COMPOSE_FILE" stop "$service" 2>&1 | logger -t "$LOG_TAG"
+    rm -f "$STATE_DIR/$KERNEL"
+    ;;
+esac

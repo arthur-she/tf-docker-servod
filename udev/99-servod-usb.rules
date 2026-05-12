@@ -1,0 +1,14 @@
+# Manage the docker-compose servod container tied to a Google Ti50 (18d1:504a).
+# The mapping from USB serial to compose service is resolved at runtime from
+# docker-compose.yaml by /usr/local/bin/servod-usb-handler, so the serial is
+# never hard-coded here.
+#
+# On add: ATTR{idVendor}/idProduct readable from sysfs; ID_SERIAL_SHORT populated
+# by built-in usb_id rules. Handler persists kernel->serial to /run/servod-usb/.
+# On remove: sysfs is gone, so ID_SERIAL_SHORT cannot be re-derived. We match on
+# kernel-provided ENV{PRODUCT} and pass $kernel; the handler reads the persisted
+# serial from /run/servod-usb/$kernel.
+
+ACTION=="add", SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="18d1", ATTR{idProduct}=="504a", ENV{ID_SERIAL_SHORT}=="?*", RUN+="/usr/bin/systemd-run --no-block --collect --unit=servod-usb-add-$env{ID_SERIAL_SHORT} /usr/local/bin/servod-usb-handler add $kernel $env{ID_SERIAL_SHORT}"
+
+ACTION=="remove", SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ENV{PRODUCT}=="18d1/504a/*", RUN+="/usr/bin/systemd-run --no-block --collect --unit=servod-usb-remove-$kernel /usr/local/bin/servod-usb-handler remove $kernel"
