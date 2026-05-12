@@ -23,6 +23,19 @@ for f in servod-usb-handler 99-servod-usb.rules servod-usb.conf; do
   fi
 done
 
+missing=()
+for cmd in docker jq systemd-tmpfiles udevadm logger; do
+  command -v "$cmd" >/dev/null 2>&1 || missing+=("$cmd")
+done
+if ! docker compose version >/dev/null 2>&1; then
+  missing+=("docker compose plugin")
+fi
+if (( ${#missing[@]} )); then
+  echo "error: required tools not found: ${missing[*]}" >&2
+  echo "       on Debian/Ubuntu: sudo apt-get install jq docker.io docker-compose-plugin" >&2
+  exit 1
+fi
+
 SUDO=""
 if [[ $EUID -ne 0 ]]; then
   SUDO="sudo"

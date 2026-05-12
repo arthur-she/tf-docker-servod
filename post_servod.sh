@@ -5,7 +5,6 @@ set -x
 DUT_CONTROL="/usr/local/bin/dut-control"
 PTS_DIR="/run/pts"
 PORT_FLAG="--port ${PORT}"
-DATE="`date`"
 
 create_uart_links() {
     if [ -n "$LAVA_DEVICE" ]; then
@@ -21,12 +20,11 @@ create_uart_links() {
 /start_servod.sh &
 PID=$!
 
-/usr/bin/wait-for-it -t 120 localhost:${PORT}
-if [ $? -eq 0 ]; then
+if /usr/bin/wait-for-it -t 120 "localhost:${PORT}"; then
     sleep 5
     create_uart_links
-    echo "Started on ${DATE}"
-    wait ${PID}
+    echo "Started on $(date)"
+    wait "${PID}"
 else
     echo "servod launch failed"
     exit 1
@@ -34,5 +32,4 @@ fi
 
 rm -f /servod.pid
 
-echo "servod has been terminated on `date`!!"
-
+echo "servod has been terminated on $(date)!!"

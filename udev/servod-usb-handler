@@ -54,36 +54,14 @@ case "$ACTION" in
 esac
 
 service="$(
-  /usr/bin/python3 - "$COMPOSE_FILE" "$SERIAL" <<'PY'
-import re, sys
-path, target = sys.argv[1], sys.argv[2]
-in_services = False
-current = None
-match = None
-with open(path) as fh:
-    for raw in fh:
-        line = raw.rstrip("\n")
-        stripped = line.lstrip()
-        if not stripped:
-            continue
-        indent = len(line) - len(stripped)
-        if indent == 0:
-            in_services = stripped.startswith("services:")
-            current = None
-            continue
-        if not in_services:
-            continue
-        if stripped.startswith("#"):
-            continue
-        if indent == 2 and stripped.endswith(":"):
-            current = stripped[:-1].strip()
-            continue
-        m = re.match(r"-\s*SERIAL\s*=\s*(\S+)", stripped)
-        if m and m.group(1) == target and current:
-            match = current
-            break
-print(match or "")
-PY
+  /usr/bin/docker compose -f "$COMPOSE_FILE" config --format json \
+    | /usr/bin/jq -r --arg s "$SERIAL" '
+        .services
+        | to_entries[]
+        | select(.value.environment.SERIAL == $s)
+        | .key
+      ' \
+    | head -n1
 )"
 
 if [[ -z "$service" ]]; then
