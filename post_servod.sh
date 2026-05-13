@@ -1,35 +1,37 @@
 #!/bin/bash
+# Container entrypoint. Launches servod via the base image's /start_servod.sh,
+# waits for it to accept connections, then publishes the DUT UART pty paths
+# under /run/pts/ so the LAVA worker can reach them by a stable name.
 
 set -x
 
 DUT_CONTROL="/usr/local/bin/dut-control"
 PTS_DIR="/run/pts"
+PORT="${PORT:-9999}"
 PORT_FLAG="--port ${PORT}"
 
 create_uart_links() {
-    if [ -n "$LAVA_DEVICE" ]; then
-        CPU_UART="$(${DUT_CONTROL} ${PORT_FLAG} cpu_uart_pty | awk -F':' '{print $2}')"
-        [ -n "${CPU_UART}" ] && ln -fs "${CPU_UART}" "${PTS_DIR}/cpu_uart-${LAVA_DEVICE}"
-        CR50_UART="$(${DUT_CONTROL} ${PORT_FLAG} cr50_uart_pty | awk -F':' '{print $2}')"
-        [ -n "${CR50_UART}" ] && ln -fs "${CR50_UART}" "${PTS_DIR}/cr50_uart-${LAVA_DEVICE}"
-        EC_UART="$(${DUT_CONTROL} ${PORT_FLAG} ec_uart_pty | awk -F':' '{print $2}')"
-        [ -n "${EC_UART}" ] && ln -fs "${EC_UART}" "${PTS_DIR}/ec_uart-${LAVA_DEVICE}"
-    fi
+    [ -n "${LAVA_DEVICE}" ] || return 0
+    local name uart
+    for name in cpu cr50 ec; do
+        uart="$(${DUT_CONTROL} ${PORT_FLAG} "${name}_uart_pty" | awk -F':' '{print $2}')"
+        [ -n "${uart}" ] && ln -fs "${uart}" "${PTS_DIR}/${name}_uart-${LAVA_DEVICE}"
+    done
 }
 
 /start_servod.sh &
 PID=$!
+trap 'kill -TERM "${PID}" 2>/dev/null' INT TERM
 
 if /usr/bin/wait-for-it -t 120 "localhost:${PORT}"; then
     sleep 5
     create_uart_links
-    echo "Started on $(date)"
+    echo "servod started on $(date)"
     wait "${PID}"
 else
     echo "servod launch failed"
+    kill -TERM "${PID}" 2>/dev/null
     exit 1
 fi
 
-rm -f /servod.pid
-
-echo "servod has been terminated on $(date)!!"
+echo "servod terminated on $(date)"

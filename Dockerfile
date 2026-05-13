@@ -27,13 +27,10 @@ LABEL com.centurylinklabs.watchtower.enable="false"
 RUN apt-get autoclean \
     && rm -rf /var/lib/apt/lists/*
 
-#RUN ln -s /usr/bin/futility /usr/bin/gbb_utility
-
-# Add --log-dir parameter to servod
-RUN sed -i '$ s/$/ \\/' /start_servod.sh; \
-    echo "    --log-dir /var/log/servod &" >> /start_servod.sh; \
-    echo "echo \$! > /servod.pid" >> /start_servod.sh; \
-    echo "\nwait \$(cat /servod.pid)" >> /start_servod.sh
+# The base image's /start_servod.sh launches `servod ... --log-dir /var/log`.
+# Retarget it to /var/log/servod so servod's logs land on the host-mounted
+# volume declared in docker-compose.yaml.
+RUN mkdir -p /var/log/servod \
+    && sed -i 's#--log-dir /var/log"#--log-dir /var/log/servod"#' /start_servod.sh
 
 COPY post_servod.sh /post_servod.sh
-COPY stop_servod.sh /stop_servod.sh

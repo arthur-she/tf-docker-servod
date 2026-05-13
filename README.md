@@ -15,8 +15,7 @@ serial on a dedicated TCP port.
 | --- | --- |
 | `Dockerfile` | Image, derived from `us-docker.pkg.dev/chromeos-hw-tools/servod/servod`. |
 | `docker-compose.yaml` | Per-host service definitions. `x-common` holds the shared settings; each service pins `PORT`, `BOARD`, `MODEL`, `SERIAL`, `LAVA_DEVICE`. |
-| `post_servod.sh` | Container entrypoint — launches `start_servod.sh` and links UART pty paths into `/run/pts/`. |
-| `start_servod.sh` / `stop_servod.sh` | Wrappers around the upstream servod start/stop scripts; baked into the image. |
+| `post_servod.sh` | Container entrypoint — launches the base-image `/start_servod.sh`, waits for servod, then links the DUT UART pty paths into `/run/pts/`. |
 | `Dockerfile.cbfstool` | Separate image that builds `cbfstool` from coreboot 4.14. |
 | `install-servod-usb-handler.sh` | Installs the udev integration (handler, rule, tmpfiles config). |
 | `udev/` | Source files for the udev integration. |
