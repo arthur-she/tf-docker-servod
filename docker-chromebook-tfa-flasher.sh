@@ -1,14 +1,22 @@
 #!/bin/bash
+# Flash an AP firmware image onto a DUT through its <DEVICE>-servod container,
+# optionally replacing the image's BL31 first. Called from LAVA jobs.
+#
+# The servo serial is read from the container's SERIAL env. -s is still
+# accepted for existing job definitions, and must match it.
 
 set -ex
 
 FLASHROM="/usr/local/sbin/flashrom"
 CBFSTOOL="/usr/local/lab-scripts/cbfstool"
-PRE_CMD=""
-POST_CMD=""
 
 usage() {
-    echo "Usage: $0 -d <DEVICE> -i <IMAGE> [-b <BL31>] -s <SERIAL_ID>" >&2
+    echo "Usage: $0 -d <DEVICE> -i <IMAGE> [-b <BL31>] [-s <SERIAL_ID>]" >&2
+    exit 1
+}
+
+die() {
+    echo "error: $*" >&2
     exit 1
 }
 
@@ -16,13 +24,13 @@ while getopts "d:i:b:s:" argv
 do
     case $argv in
         i)
-            [ -f "${OPTARG}" ] && IMAGE=${OPTARG}
+            IMAGE=${OPTARG}
             ;;
         b)
-            [ -f "${OPTARG}" ] && BL31=${OPTARG}
+            BL31=${OPTARG}
             ;;
         s)
-            SERIALID=${OPTARG}
+            SERIALID_ARG=${OPTARG}
             ;;
         d)
             DEVICE=${OPTARG}
@@ -33,12 +41,35 @@ do
     esac
 done
 
-[ -z "${IMAGE}" -o -z "${SERIALID}" -o -z "${DEVICE}" ] && usage
+[ -z "${IMAGE}" -o -z "${DEVICE}" ] && usage
+[ -f "${IMAGE}" ] || die "image not found: ${IMAGE}"
+[ -z "${BL31}" -o -f "${BL31}" ] || die "BL31 not found: ${BL31}"
 
-if $(file ${IMAGE} | grep -q "gzip compressed data"); then
-    IMAGE_BIN=$(dirname ${IMAGE})/${DEVICE}-${SERIALID}-fw.bin
-    gunzip -c ${IMAGE} > ${IMAGE_BIN}
-    IMAGE=${IMAGE_BIN}
+CONTAINER="${DEVICE}-servod"
+SERIALID=$(docker exec "${CONTAINER}" printenv SERIAL) \
+    || die "cannot read SERIAL from container ${CONTAINER}"
+[ -n "${SERIALID}" ] || die "SERIAL is empty in container ${CONTAINER}"
+if [ -n "${SERIALID_ARG}" -a "${SERIALID_ARG}" != "${SERIALID}" ]; then
+    die "-s ${SERIALID_ARG} does not match ${CONTAINER} SERIAL=${SERIALID}"
+fi
+
+# Work on a private copy so the caller's image is never modified, and clean
+# up both the host copy and the one pushed into the container on any exit.
+WORKDIR=$(mktemp -d)
+IMAGE_BIN="${WORKDIR}/${DEVICE}-${SERIALID}-fw.bin"
+CONTAINER_IMAGE="/$(basename "${IMAGE_BIN}")"
+cleanup() {
+    rm -rf "${WORKDIR}"
+    if [ -n "${COPIED}" ]; then
+        docker exec "${CONTAINER}" rm -f "${CONTAINER_IMAGE}" || true
+    fi
+}
+trap cleanup EXIT
+
+if file "${IMAGE}" | grep -q "gzip compressed data"; then
+    gunzip -c "${IMAGE}" > "${IMAGE_BIN}"
+else
+    cp "${IMAGE}" "${IMAGE_BIN}"
 fi
 
 echo "Device: \"${DEVICE}\" Image: \"${IMAGE}\" BL31: \"${BL31}\" SERIALID: \"${SERIALID}\""
@@ -46,16 +77,15 @@ echo "Device: \"${DEVICE}\" Image: \"${IMAGE}\" BL31: \"${BL31}\" SERIALID: \"${
 if [ -n "${BL31}" ]; then
     echo "Got a new BL31"
     # Replace the BL31
-    ${CBFSTOOL} "${IMAGE}" remove -n fallback/bl31
-    ${CBFSTOOL} "${IMAGE}" add-payload -n fallback/bl31 -f "${BL31}"
+    "${CBFSTOOL}" "${IMAGE_BIN}" remove -n fallback/bl31
+    "${CBFSTOOL}" "${IMAGE_BIN}" add-payload -n fallback/bl31 -f "${BL31}"
 fi
 
 # Copy the image to the container
-docker cp "${IMAGE}" ${DEVICE}-servod:/
+COPIED=1
+docker cp "${IMAGE_BIN}" "${CONTAINER}:${CONTAINER_IMAGE}"
 # Flash the firmware
-IMAGE=$(basename ${IMAGE})
-docker exec ${DEVICE}-servod ${FLASHROM} -n -w "/${IMAGE}" -p raiden_debug_spi:target=AP,serial="${SERIALID}"
-# Delete the image
-docker exec ${DEVICE}-servod rm /${IMAGE}
+docker exec "${CONTAINER}" "${FLASHROM}" -n -w "${CONTAINER_IMAGE}" \
+    -p raiden_debug_spi:target=AP,serial="${SERIALID}"
 
 sleep 10
