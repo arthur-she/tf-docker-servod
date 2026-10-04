@@ -104,7 +104,10 @@ docker-chromebook-tfa-flasher.sh -d geralt-01 -i image.bin[.gz] [-b bl31.elf] [-
 - Works on a temporary copy of the image (gunzipped if needed), so the input
   file is never modified.
 - With `-b`, replaces `fallback/bl31` in the image using the host's
-  `/usr/local/lab-scripts/cbfstool` (see `Dockerfile.cbfstool`).
+  `/usr/local/lab-scripts/cbfstool` (see `Dockerfile.cbfstool`). BL31 is
+  optional: with no `-b`, an empty value, or an unfilled LAVA placeholder
+  such as `{BL31}` (a job with no `bl31` image, e.g. health-check firmware),
+  the image is flashed as-is.
 - Copies the image into the container and writes it with
   `flashrom -p raiden_debug_spi:target=AP`, then removes it again.
 - The servo serial is read from the container's `SERIAL`. `-s` is optional;

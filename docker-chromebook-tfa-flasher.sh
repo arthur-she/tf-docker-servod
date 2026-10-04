@@ -27,7 +27,13 @@ do
             IMAGE=${OPTARG}
             ;;
         b)
-            BL31=${OPTARG}
+            # BL31 is optional (e.g. health-check firmware has none). Device
+            # templates always pass -b {BL31}, and LAVA leaves the
+            # placeholder as-is when the job defines no bl31 image.
+            case ${OPTARG} in
+                ""|"{"*"}") ;;
+                *) BL31=${OPTARG} ;;
+            esac
             ;;
         s)
             SERIALID_ARG=${OPTARG}
@@ -79,6 +85,8 @@ if [ -n "${BL31}" ]; then
     # Replace the BL31
     "${CBFSTOOL}" "${IMAGE_BIN}" remove -n fallback/bl31
     "${CBFSTOOL}" "${IMAGE_BIN}" add-payload -n fallback/bl31 -f "${BL31}"
+else
+    echo "No BL31 given, flashing the image as-is"
 fi
 
 # Copy the image to the container
