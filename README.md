@@ -13,8 +13,8 @@ serial on a dedicated TCP port.
 
 | Path | Purpose |
 | --- | --- |
-| `Dockerfile` | Image, derived from `us-docker.pkg.dev/chromeos-hw-tools/servod/servod`. |
-| `docker-compose.yaml` | Per-host service definitions. `x-common` holds the shared settings; each service pins `PORT`, `BOARD`, `MODEL`, `SERIAL`, `LAVA_DEVICE`. |
+| `Dockerfile` | Image, derived from `us-docker.pkg.dev/chromeos-hw-tools/servod/servod`. Replaces the stock flashrom with a pinned upstream build (see below) and makes servod's gRPC ports configurable per container. |
+| `docker-compose.yaml` | Per-host service definitions. `x-common` holds the shared settings; each service pins `PORT`, `BOARD`, `MODEL`, `SERIAL`, `LAVA_DEVICE`, and, when a host runs more than one service, `GRPC_DATA_PORT`/`GRPC_CORE_PORT`. |
 | `post_servod.sh` | Container entrypoint — launches the base-image `/start_servod.sh`, waits for servod, then links the DUT UART pty paths into `/run/pts/`. |
 | `Dockerfile.cbfstool` | Separate image that builds `cbfstool` from coreboot 4.14. |
 | `install-servod-usb-handler.sh` | Installs the udev integration (handler, rule, tmpfiles config). |
@@ -39,7 +39,13 @@ services:
       - BOARD=geralt
       - SERIAL=1400e002-4c1b4b03    # the USB serial of the Ti50
       - LAVA_DEVICE=geralt-01
+      - GRPC_DATA_PORT=50101        # unique per service on this host
+      - GRPC_CORE_PORT=50102
 ```
+
+Containers use `network_mode: host`, so each one's servod port and gRPC ports
+must be unique on the host. `GRPC_DATA_PORT`/`GRPC_CORE_PORT` default to
+upstream's 50051/50052, which is fine for a single service.
 
 Then:
 
@@ -54,6 +60,31 @@ docker exec geralt-01-servod \
 
 The container's `restart: always` policy means servod is brought back up after
 host reboots and after the servod process exits.
+
+## flashrom
+
+The image builds flashrom from
+[chromiumos/third_party/flashrom](https://chromium.googlesource.com/chromiumos/third_party/flashrom)
+at a pinned commit (`FLASHROM_REF` in the `Dockerfile`) and installs it as
+`/usr/local/sbin/flashrom` in place of the servod image's own. The pin must
+include `794ac5ef` ("raiden_debug_spi: Check serial before claiming USB
+device"); the build fails otherwise. Without that fix, `raiden_debug_spi`
+claims each Ti50's USB interface before checking its serial and resets a Ti50
+it finds busy, so flashing one DUT can disrupt a concurrent flash of another
+DUT on the same host.
+
+## Rebuilding the image
+
+`FROM` uses `us-docker.pkg.dev/chromeos-hw-tools/servod/servod:${RELEASE_TYPE}`
+(default `latest`). Never tag a local build with that name: the next build
+would stack this Dockerfile's edits on top of an already edited image. Pull
+the upstream image before rebuilding:
+
+```bash
+docker pull us-docker.pkg.dev/chromeos-hw-tools/servod/servod:latest
+docker compose build
+docker compose up -d
+```
 
 ## udev auto start/stop
 
