@@ -19,6 +19,14 @@ create_uart_links() {
     done
 }
 
+# servod registers the devices it serves under /run/servoscratch, which lives
+# in the container filesystem and so survives a container restart. No servod
+# runs in this container yet, so any entry there is stale. servod itself only
+# drops one once it can bind the old port, which fails while that port has
+# TIME_WAIT connections, and it then refuses to start ("already served by
+# another servod instance").
+find /run/servoscratch -maxdepth 1 ! -type d -delete 2>/dev/null
+
 /start_servod.sh &
 PID=$!
 trap 'kill -TERM "${PID}" 2>/dev/null' INT TERM
