@@ -112,6 +112,8 @@ docker-chromebook-tfa-flasher.sh -d geralt-01 -i image.bin[.gz] [-b bl31.elf] [-
   `flashrom -p raiden_debug_spi:target=AP`, then removes it again.
 - The servo serial is read from the container's `SERIAL`. `-s` is optional;
   if given, it must match.
+- If flashing fails, restarts the container, waits for servod, and flashes
+  again, up to `SERVOD_MAX_RESTARTS` times (default 2).
 
 ### `docker-dut-control-wrapper.sh`
 
@@ -122,9 +124,11 @@ docker-dut-control-wrapper.sh -d geralt-01 -p 9999 -c 'power_state:off'
 - Runs `dut-control --port <port> <command>` in the container. `-c` may hold
   several space-separated controls.
 - On failure, retries once. If that also fails, restarts the container, waits
-  for servod, and tries a last time.
-- A restart re-creates the DUT UART ptys, so any console already open on the
-  old pty is lost; the script prints a `WARNING` when this happens.
+  for servod, and retries, up to `SERVOD_MAX_RESTARTS` times (default 2).
+
+In both scripts, a restart re-creates the DUT UART ptys, so any console
+already open on the old pty is lost; the scripts print a `WARNING` when this
+happens.
 
 ## Per-host configuration
 
