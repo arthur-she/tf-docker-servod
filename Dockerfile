@@ -59,10 +59,7 @@ RUN apt-get update --no-install-recommends \
         net-tools \
         tzdata \
         wait-for-it \
-        libjaylink0 \
-        libftdi1-2 \
-        libusb-1.0-0 \
-        libpci3
+        libjaylink0
 
 # Avoid watchtower updating servod, it gets pulled before every start of the
 # container, we should not stop/start it in the case a new version is pushed.
